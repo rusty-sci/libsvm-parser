@@ -1,0 +1,13 @@
+[package]
+name = "libsvm_parser"
+version = "0.2.1"
+authors = ["MoonL1ght <ixav1@icloud.com>"]
+edition = "2018"
+keywords = ["libsvm", "parser"]
+license = "APACHE, MIT"
+
+[dependencies]
+termcolor = "1.0.4"
+
+[dev-dependencies]
+pretty_assertions = "0.4.0"
