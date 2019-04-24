@@ -1,6 +1,6 @@
 [package]
 name = "libsvm_parser"
-version = "0.2.1"
+version = "0.1.1"
 authors = ["MoonL1ght <ixav1@icloud.com>"]
 edition = "2018"
 keywords = ["libsvm", "parser"]
