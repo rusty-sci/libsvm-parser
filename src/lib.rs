@@ -1,11 +1,10 @@
 /// LIBSVMParser is for parsing libsvm file format.
 use std::path::Path;
 use std::fs::File;
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::io::{BufReader, BufRead};
 use std::str::FromStr;
 use std::fmt::Debug;
-use std::hash::Hash;
 
 #[derive(Debug)]
 pub struct LIBSVMParser {
@@ -20,7 +19,7 @@ impl LIBSVMParser {
     }
   }
 
-  /// If init with true, than read_file returns HashSet with unique classes.
+  /// If init with true, than read_file returns HashMap with unique classes.
   pub fn is_classification(self, is_classification: bool) -> Self {
     Self {
       is_classif: is_classification,
@@ -29,32 +28,16 @@ impl LIBSVMParser {
   }
 
   /// Read and parse libsvm file line by line.
-  pub fn parse_file<T, U>(&self, file: &Path) ->
-    (Vec<Vec<T>>, Option<HashSet<U>>) where
-    T: FromStr + Debug,
-    U: FromStr + Debug + Hash + Eq {
-    let file = if file.exists() {
-      let ext = match file.extension() {
-        Some(ext) => ext,
-        None => panic!("Wrong file format, expected .libsvm")
-      };
-      if ext != "libsvm" {
-        panic!("Wrong file format, expected .libsvm but found: {:?}", ext);
-      }
-      file
-    } else {
-      panic!("File {:?} doesn't exist.", file);
-    };
-    let file = match File::open(file) {
-      Ok(file) => file,
-      Err(err) => panic!("Error in opening file. {:?}", err)
-    };
+  pub fn parse_file<T>(&self, file: &Path) ->
+    (Vec<Vec<T>>, Option<HashMap<String, T>>) where
+    T: FromStr + Copy + Debug {
+    let file = LIBSVMParser::open_file(file);
     let mut buf_reader = BufReader::new(file);
     let mut line = String::new();
     let mut data: Vec<Vec<T>> = Vec::new();
-    let mut classes: Option<HashSet<U>> = None;
+    let mut classes: Option<HashMap<String, T>> = None;
     if self.is_classif {
-      classes = Some(HashSet::new());
+      classes = Some(HashMap::<String, T>::new());
     }
     let mut line_num = 1;
     while buf_reader.read_line(&mut line)
@@ -65,21 +48,38 @@ impl LIBSVMParser {
       let target = values.next();
       match target {
         Some(target) => {
-          match target.parse::<T>() {
-            Ok(target) => sample.push(target),
-            Err(_) => panic!("Error in parsing target. Error in line: {:?}", line_num)
-          }
-          match classes {
-            Some(ref mut classes) => {
-              match target.parse::<U>() {
-                Ok(target) => { classes.insert(target); },
-                Err(_) => panic!("Error in parsing uniq classes. Error in line: {:?}", line_num)
+          if self.is_classif {
+            match classes {
+              Some(ref mut cl) => {
+                match cl.get(target) {
+                  Some(value) => {
+                    sample.push(*value);
+                  },
+                  None => {
+                    match cl.len().to_string().parse::<T>() {
+                      Ok(class_index) => {
+                        sample.push(class_index);
+                        cl.insert(target.to_string(), class_index);
+                      },
+                      Err(_) => {
+                        panic!("Error in parsing target (1). Error in line: {:?}", line_num);
+                      }
+                    }
+                  }
+                }
+              },
+              None => panic!("Error in parsing target (2). Error in line: {:?}", line_num)
+            }
+          } else {
+            match target.parse::<T>() {
+              Ok(target) => sample.push(target),
+              Err(_) => {
+                panic!("Error in parsing target as Type. Error in line: {:?}", line_num)
               }
-            },
-            None => ()
+            }
           }
         },
-        None => panic!("Error in parsing target. Error in line: {:?}", line_num)
+        None => panic!("Error in parsing target (3). Error in line: {:?}", line_num)
       }
       for value in values {
         let feature: Vec<&str> = value.split(':').collect();
@@ -94,6 +94,25 @@ impl LIBSVMParser {
       line_num += 1;
     }
     (data, classes)
+  }
+
+  fn open_file(file: &Path) -> File {
+    let file = if file.exists() {
+      let ext = match file.extension() {
+        Some(ext) => ext,
+        None => panic!("Wrong file format, expected .libsvm")
+      };
+      if ext != "libsvm" {
+        panic!("Wrong file format, expected .libsvm but found: {:?}", ext);
+      }
+      file
+    } else {
+      panic!("File {:?} doesn't exist.", file);
+    };
+    match File::open(file) {
+      Ok(file) => file,
+      Err(err) => panic!("Error in opening file. {:?}", err)
+    }
   }
 
 }
